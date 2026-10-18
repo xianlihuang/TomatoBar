@@ -84,6 +84,7 @@ rolling **prerelease** named `prerelease`; pushing a `v*` tag publishes a normal
 Builds are ad-hoc signed, not notarized, and the downloadable archive is attached to the
 release together with its SHA-256 checksum. The current rolling prerelease is available at
 [github.com/xianlihuang/TomatoBar/releases/tag/prerelease](https://github.com/xianlihuang/TomatoBar/releases/tag/prerelease).
+See [CHANGELOG.md](CHANGELOG.md) for the main changes in each release.
 
 ## Older versions
 Touch bar integration is available in TomatoBar versions prior to 3.0. Versions prior to 4.0
