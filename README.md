@@ -25,7 +25,7 @@ intervals.
 
 ## Requirements
 - macOS 27 or later
-- Apple silicon or Intel Mac
+- Apple silicon Mac
 
 ## Features
 - Configurable focus, short break, and long break intervals
@@ -77,6 +77,12 @@ open tomatobar://hide
 ## Development
 Open `TomatoBar.xcodeproj` in Xcode 27, select the TomatoBar scheme, and run. The app is a
 menu bar app (`LSUIElement`), so it does not appear in the Dock.
+
+## Builds and releases
+GitHub Actions builds every push on the `xcode-27` runner. Pushes to any branch publish a
+rolling **prerelease** named `prerelease`; pushing a `v*` tag publishes a normal release.
+Builds are ad-hoc signed, not notarized, and the downloadable archive is attached to the
+release together with its SHA-256 checksum.
 
 ## Older versions
 Touch bar integration is available in TomatoBar versions prior to 3.0. Versions prior to 4.0

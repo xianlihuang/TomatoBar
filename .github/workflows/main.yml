@@ -1,4 +1,4 @@
-name: main
+name: build-and-release
 
 on:
   push:
@@ -6,67 +6,118 @@ on:
       - '*'
     tags:
       - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: macos-27
+    runs-on: xcode-27
+    timeout-minutes: 45
 
     steps:
-      - name: Show Xcode version
-        run: xcodebuild -version
-
-      - name: Delete old prerelease
-        if: github.ref_type == 'branch'
-        uses: dev-drprasad/delete-tag-and-release@v1.1
-        with:
-          delete_release: true
-          tag_name: prerelease
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set version for tag
-        if: github.ref_type == 'tag'
-        run: echo "version=$(git describe --tags --match 'v*')" >> $GITHUB_ENV
-
-      - name: Set version for branch
-        if: github.ref_type == 'branch'
-        run: echo "version=$(git describe --tags)" >> $GITHUB_ENV
-
-      - name: Import signing certificate
-        uses: apple-actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.CODESIGN_CERT_BASE64 }}
-          p12-password: ${{ secrets.CODESIGN_CERT_PASSWORD }}
-
-      - name: Trust signing certificate
+      - name: Show toolchain
         run: |
-          echo "${{ secrets.CODESIGN_CERT_PEM_BASE64 }}" | base64 -d > /tmp/ci-cert.pem
-          sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/ci-cert.pem
-          rm /tmp/ci-cert.pem
+          xcodebuild -version
+          xcodebuild -showsdks | grep macosx
+
+      - name: Resolve version
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+            PRERELEASE="false"
+          else
+            VERSION="4.0.${GITHUB_RUN_NUMBER}"
+            RELEASE_TAG="prerelease"
+            PRERELEASE="true"
+          fi
+          {
+            echo "VERSION=${VERSION}"
+            echo "RELEASE_TAG=${RELEASE_TAG}"
+            echo "PRERELEASE=${PRERELEASE}"
+          } >> "$GITHUB_ENV"
+          echo "Building ${VERSION} for ${RELEASE_TAG}"
 
       - name: Build
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          BUILT_PRODUCTS_DIR=$(xcodebuild -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release -showBuildSettings | awk '/^ *BUILT_PRODUCTS_DIR = / {print $3}')
-          xcodebuild build -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release MARKETING_VERSION="$VERSION" CODE_SIGN_IDENTITY="CI Code Signing" CODE_SIGN_STYLE=Manual ONLY_ACTIVE_ARCH=NO
-          cp -r "$BUILT_PRODUCTS_DIR/TomatoBar.app" .
-          zip -r "TomatoBar-${{env.version}}.zip" "TomatoBar.app"
+          set -euo pipefail
+          xcodebuild \
+            -project TomatoBar.xcodeproj \
+            -scheme TomatoBar \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            DEVELOPMENT_TEAM="" \
+            ARCHS=arm64 \
+            build
 
-      - name: Release
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
+      - name: Sign
+        run: |
+          set -euo pipefail
+          APP="build/Build/Products/Release/TomatoBar.app"
+          HELPER="$APP/Contents/Library/LoginItems/LaunchAtLoginHelper.app"
+          test -d "$APP"
+          xattr -cr "$APP"
+          if [[ -d "$HELPER" ]]; then
+            codesign --force --sign - --timestamp=none "$HELPER"
+          fi
+          codesign --force --sign - --timestamp=none \
+            --entitlements TomatoBar/TomatoBar.entitlements "$APP"
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          APP="build/Build/Products/Release/TomatoBar.app"
+          test -d "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "TomatoBar-${VERSION}.zip"
+          shasum -a 256 "TomatoBar-${VERSION}.zip" | tee "TomatoBar-${VERSION}.zip.sha256"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: TomatoBar-${{env.version}}.zip
+          name: TomatoBar-${{ env.VERSION }}
+          path: |
+            TomatoBar-${{ env.VERSION }}.zip
+            TomatoBar-${{ env.VERSION }}.zip.sha256
+          retention-days: 14
 
-      - name: Prerelease
+      - name: Remove previous rolling prerelease
         if: github.ref_type == 'branch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete prerelease --cleanup-tag --yes || true
+          git push origin :refs/tags/prerelease || true
+
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: prerelease
-          prerelease: true
-          files: TomatoBar-${{env.version}}.zip
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.PRERELEASE == 'true' && format('TomatoBar {0} (prerelease)', env.VERSION) || format('TomatoBar {0}', env.VERSION) }}
+          body: |
+            Automated build of `${{ github.sha }}` from `${{ github.ref_name }}`.
+
+            - Requires macOS 27 or later.
+            - Ad-hoc signed and not notarized.
+          prerelease: ${{ env.PRERELEASE == 'true' }}
+          files: |
+            TomatoBar-${{ env.VERSION }}.zip
+            TomatoBar-${{ env.VERSION }}.zip.sha256
+          fail_on_unmatched_files: true
+          overwrite_files: true
