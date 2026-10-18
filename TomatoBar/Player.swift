@@ -11,6 +11,9 @@ final class TBPlayer: ObservableObject {
         didSet {
             defaults.set(windupVolume, forKey: TBPreferences.windupVolume)
             applyVolume(windupSound, windupVolume)
+            if windupVolume <= 0 {
+                windupSound?.stop()
+            }
         }
     }
 
@@ -18,6 +21,9 @@ final class TBPlayer: ObservableObject {
         didSet {
             defaults.set(dingVolume, forKey: TBPreferences.dingVolume)
             applyVolume(dingSound, dingVolume)
+            if dingVolume <= 0 {
+                dingSound?.stop()
+            }
         }
     }
 
@@ -25,6 +31,16 @@ final class TBPlayer: ObservableObject {
         didSet {
             defaults.set(tickingVolume, forKey: TBPreferences.tickingVolume)
             applyVolume(tickingSound, tickingVolume)
+
+            if tickingVolume <= 0 {
+                tickingPreviewWorkItem?.cancel()
+                tickingPreviewWorkItem = nil
+                isPreviewingTicking = false
+                tickingSound?.stop()
+                tickingSound?.currentTime = 0
+            } else if isTicking, !isPreviewingTicking {
+                tickingSound?.play()
+            }
         }
     }
 
@@ -63,12 +79,18 @@ final class TBPlayer: ObservableObject {
     // MARK: - Playback
 
     func playWindup() {
+        guard windupVolume > 0 else {
+            return
+        }
         windupSound?.stop()
         windupSound?.currentTime = 0
         windupSound?.play()
     }
 
     func playDing() {
+        guard dingVolume > 0 else {
+            return
+        }
         dingSound?.stop()
         dingSound?.currentTime = 0
         dingSound?.play()
@@ -83,6 +105,9 @@ final class TBPlayer: ObservableObject {
             return
         }
         isTicking = true
+        guard tickingVolume > 0 else {
+            return
+        }
         tickingSound.currentTime = 0
         tickingSound.play()
     }
@@ -131,7 +156,7 @@ final class TBPlayer: ObservableObject {
         }
 
         tickingPreviewWorkItem?.cancel()
-        guard let tickingSound else {
+        guard tickingVolume > 0, let tickingSound else {
             return
         }
         tickingSound.stop()

@@ -79,11 +79,15 @@ struct TBPopoverView: View {
     @ObservedObject var timer: TBTimer
     var onClose: () -> Void
 
-    @State private var activeTab: PopoverTab = .intervals
+    @AppStorage("popoverActiveTab") private var activeTabRaw = PopoverTab.intervals.rawValue
     @Namespace private var tabNamespace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let contentHeight: CGFloat = 172
+
+    private var activeTab: PopoverTab {
+        PopoverTab(rawValue: activeTabRaw) ?? .intervals
+    }
 
     private var accent: Color {
         TBPalette.accent(for: timer.phase)
@@ -434,10 +438,10 @@ struct TBPopoverView: View {
 
     private func select(_ tab: PopoverTab) {
         if reduceMotion {
-            activeTab = tab
+            activeTabRaw = tab.rawValue
         } else {
             withAnimation(.snappy(duration: 0.28)) {
-                activeTab = tab
+                activeTabRaw = tab.rawValue
             }
         }
     }
@@ -451,9 +455,9 @@ struct TBPopoverView: View {
         NSApplication.shared.terminate(nil)
     }
 
-    private static var appVersion: String? {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-    }
+    private static let appVersion = Bundle.main.object(
+        forInfoDictionaryKey: "CFBundleShortVersionString"
+    ) as? String
 }
 
 // MARK: - Intervals

@@ -23,12 +23,22 @@ struct TBApp: App {
     }
 }
 
-final class TBStatusItem: NSObject, NSApplicationDelegate {
+final class TBStatusItem: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     static var shared: TBStatusItem?
 
     private static let digitFont = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+    private static let titleAttributes: [NSAttributedString.Key: Any] = {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineHeightMultiple = 0.95
+        paragraphStyle.alignment = .center
+        return [
+            .font: TBStatusItem.digitFont,
+            .paragraphStyle: paragraphStyle,
+            .foregroundColor: NSColor.labelColor,
+        ]
+    }()
 
-    private let popover = NSPopover()
+    private var popover: NSPopover?
     private var statusBarItem: NSStatusItem?
     private var timer: TBTimer?
 
@@ -37,7 +47,6 @@ final class TBStatusItem: NSObject, NSApplicationDelegate {
 
         configureStatusItem()
         configureTimer()
-        configurePopover()
     }
 
     func applicationWillTerminate(_: Notification) {
@@ -75,45 +84,22 @@ final class TBStatusItem: NSObject, NSApplicationDelegate {
             return
         }
 
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineHeightMultiple = 0.95
-        paragraphStyle.alignment = .center
-
         button.attributedTitle = NSAttributedString(
             string: " \(title)",
-            attributes: [
-                .font: Self.digitFont,
-                .paragraphStyle: paragraphStyle,
-                .foregroundColor: NSColor.labelColor,
-            ]
+            attributes: Self.titleAttributes
         )
         button.setAccessibilityValue(title)
     }
 
-    func setIcon(name: NSImage.Name) {
+    func setIcon(name _: NSImage.Name) {
         guard let button = statusBarItem?.button else {
             return
         }
 
-        // SF Symbols render reliably in the macOS 27 menu bar and stay legible
-        // in both light and dark appearances. The bundled template assets are
-        // kept as a fallback.
-        let symbolName: String
-        switch name {
-        case .work:
-            symbolName = "timer"
-        case .shortRest:
-            symbolName = "cup.and.saucer.fill"
-        case .longRest:
-            symbolName = "moon.zzz.fill"
-        default:
-            symbolName = "timer"
-        }
-
-        let configuration = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
-        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "TomatoBar")?
-            .withSymbolConfiguration(configuration)
-            ?? NSImage(named: name)
+        // Keep the tomato brand mark in every phase. The countdown in the
+        // title and the popover communicate the active state; changing the
+        // menu bar glyph is not necessary.
+        let image = NSImage(named: .idle)
         image?.isTemplate = true
         button.image = image
     }
@@ -124,13 +110,21 @@ final class TBStatusItem: NSObject, NSApplicationDelegate {
         timer = TBTimer()
     }
 
-    private func configurePopover() {
+    /// The SwiftUI popover is created lazily. Building it at launch kept an
+    /// offscreen hosting view alive (and animating) even if the user never
+    /// opened the app.
+    private func ensurePopover() -> Bool {
+        if let popover, popover.contentViewController != nil {
+            return true
+        }
         guard let timer else {
-            return
+            return false
         }
 
+        let popover = self.popover ?? NSPopover()
         popover.behavior = .transient
         popover.animates = true
+        popover.delegate = self
 
         let rootView = TBPopoverView(timer: timer) { [weak self] in
             self?.closePopover(nil)
@@ -150,27 +144,47 @@ final class TBStatusItem: NSObject, NSApplicationDelegate {
             width: preferredSize.width > 0 ? preferredSize.width : max(fittingSize.width, 320),
             height: preferredSize.height > 0 ? preferredSize.height : max(fittingSize.height, 580)
         )
+
+        self.popover = popover
+        return true
     }
 
     func showPopover(_: AnyObject?) {
-        guard let button = statusBarItem?.button, !popover.isShown else {
+        guard let button = statusBarItem?.button, ensurePopover(), let popover, !popover.isShown else {
             return
         }
 
+        timer?.isPopoverVisible = true
+        timer?.refreshTimeLeft()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate()
         popover.contentViewController?.view.window?.makeKey()
     }
 
     func closePopover(_ sender: AnyObject?) {
-        popover.performClose(sender)
+        popover?.performClose(sender)
     }
 
     @objc func togglePopover(_ sender: AnyObject?) {
-        if popover.isShown {
+        if popover?.isShown == true {
             closePopover(sender)
         } else {
             showPopover(sender)
+        }
+    }
+
+    func popoverDidClose(_: Notification) {
+        timer?.isPopoverVisible = false
+
+        // Release the SwiftUI hosting graph after the close animation. It is
+        // recreated on the next open instead of being retained for the rest of
+        // the process lifetime.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self, self.popover?.isShown != true else {
+                return
+            }
+            self.popover?.contentViewController = nil
+            self.popover = nil
         }
     }
 }

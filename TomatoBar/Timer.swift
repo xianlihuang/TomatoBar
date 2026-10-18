@@ -72,6 +72,11 @@ final class TBTimer: NSObject, ObservableObject {
     @Published private(set) var completedWorkIntervals = 0
     @Published private(set) var isLongRest = false
 
+    /// Set by the status item while the popover is visible. When the popover
+    /// is closed, there is no reason to publish a timestamp every second: only
+    /// the menu bar title needs the current value.
+    var isPopoverVisible = false
+
     // MARK: - Dependencies
 
     let player: TBPlayer
@@ -169,7 +174,8 @@ final class TBTimer: NSObject, ObservableObject {
         case .idle:
             seconds = workIntervalLength * 60
         case .work, .rest:
-            seconds = Int(ceil(max(timeLeft, 0)))
+            let remaining = finishTime.map { max($0.timeIntervalSinceNow, 0) } ?? max(timeLeft, 0)
+            seconds = Int(ceil(remaining))
         }
         return Self.format(seconds: seconds)
     }
@@ -194,6 +200,16 @@ final class TBTimer: NSObject, ObservableObject {
 
     func skipRest() {
         stateMachine <-! .skipRest
+    }
+
+    /// Bring the published countdown up to date when the popover becomes
+    /// visible again. While it is closed, `timeLeft` is intentionally not
+    /// updated on every tick.
+    func refreshTimeLeft() {
+        guard phase != .idle, let finishTime else {
+            return
+        }
+        timeLeft = max(finishTime.timeIntervalSinceNow, 0)
     }
 
     func shutdown() {
@@ -388,7 +404,7 @@ final class TBTimer: NSObject, ObservableObject {
         source.schedule(
             deadline: .now() + .seconds(1),
             repeating: .seconds(1),
-            leeway: .milliseconds(80)
+            leeway: .milliseconds(250)
         )
         source.setEventHandler { [weak self] in
             self?.onTimerTick()
@@ -413,8 +429,17 @@ final class TBTimer: NSObject, ObservableObject {
         }
 
         let remaining = finishTime.timeIntervalSinceNow
-        timeLeft = max(remaining, 0)
-        updateMenuBarTitle()
+
+        // While the popover is closed, do not publish a new time value every
+        // second. The menu bar title below is updated directly in AppKit and
+        // the SwiftUI view is refreshed by `refreshTimeLeft()` on show.
+        if isPopoverVisible {
+            timeLeft = max(remaining, 0)
+        }
+
+        if showTimerInMenuBar {
+            updateMenuBarTitle()
+        }
 
         guard remaining <= 0 else {
             return
