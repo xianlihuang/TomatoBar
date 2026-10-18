@@ -52,18 +52,38 @@ jobs:
       - name: Prepare release notes
         run: |
           set -euo pipefail
-          awk '/^## / { if (++sections == 2) exit } sections == 1' CHANGELOG.md > /tmp/changelog-section.md
-          test -s /tmp/changelog-section.md
+          NOTES=/tmp/changelog-section.md
+          awk -v version="${VERSION}" '
+            $0 ~ "^## " version "([[:space:]]|$)" { found = 1; print; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > "$NOTES"
+          if [[ ! -s "$NOTES" ]]; then
+            {
+              echo "## 本版本更新"
+              echo
+              PREV_TAG="$(git tag --sort=-version:refname --merged HEAD 'v*' | grep -v "^${GITHUB_REF_NAME}$" | head -n 1 || true)"
+              if [[ -n "$PREV_TAG" ]]; then
+                git log --no-merges --pretty=format:'- %s' "${PREV_TAG}..HEAD"
+              else
+                git log --no-merges -n 10 --pretty=format:'- %s' HEAD
+              fi
+              echo
+            } > "$NOTES"
+          fi
+          test -s "$NOTES"
           {
             echo "Automated build of \`${GITHUB_SHA}\` from \`${GITHUB_REF_NAME}\`."
             echo
-            cat /tmp/changelog-section.md
+            cat "$NOTES"
             echo
             echo "## 安装说明"
             echo
             echo "- 需要 macOS 27 或更高版本（Apple silicon）。"
             echo "- Ad-hoc 签名，未公证；首次打开如被 Gatekeeper 拦截，请右键打开。"
             echo "- 下载 \`TomatoBar-${VERSION}.zip\`，并用同目录的 \`.sha256\` 文件校验。"
+            echo
+            echo "历史版本的更新请查看对应版本的 Release。"
             echo
             echo "完整记录：[CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)"
           } > release-body.md
