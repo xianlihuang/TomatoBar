@@ -7,6 +7,15 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish a release for this build"
+        type: boolean
+        default: false
+      version:
+        description: "Release version without the leading v (required when release is true)"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -32,24 +41,43 @@ jobs:
           xcodebuild -showsdks | grep macosx
 
       - name: Resolve version
+        id: version
+        env:
+          INPUT_RELEASE: ${{ inputs.release }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
+          set -euo pipefail
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
             RELEASE_TAG="${GITHUB_REF_NAME}"
             PRERELEASE="false"
+            PUBLISH="true"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${INPUT_RELEASE}" == "true" ]]; then
+            VERSION="${INPUT_VERSION#v}"
+            if [[ -z "${VERSION}" ]]; then
+              echo "::error::version is required when release is true"
+              exit 1
+            fi
+            RELEASE_TAG="v${VERSION}"
+            PRERELEASE="false"
+            PUBLISH="true"
           else
             VERSION="4.0.${GITHUB_RUN_NUMBER}"
-            RELEASE_TAG="v${VERSION}"
+            RELEASE_TAG=""
             PRERELEASE="true"
+            PUBLISH="false"
           fi
           {
             echo "VERSION=${VERSION}"
             echo "RELEASE_TAG=${RELEASE_TAG}"
             echo "PRERELEASE=${PRERELEASE}"
+            echo "PUBLISH=${PUBLISH}"
           } >> "$GITHUB_ENV"
-          echo "Building ${VERSION} for ${RELEASE_TAG}"
+          echo "publish=${PUBLISH}" >> "$GITHUB_OUTPUT"
+          echo "Building ${VERSION} (publish=${PUBLISH})"
 
       - name: Prepare release notes
+        if: steps.version.outputs.publish == 'true'
         run: |
           set -euo pipefail
           NOTES=/tmp/changelog-section.md
@@ -138,6 +166,7 @@ jobs:
           retention-days: 14
 
       - name: Publish release
+        if: steps.version.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}

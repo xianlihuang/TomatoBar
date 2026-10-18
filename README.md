@@ -79,8 +79,9 @@ Open `TomatoBar.xcodeproj` in Xcode 27, select the TomatoBar scheme, and run. Th
 menu bar app (`LSUIElement`), so it does not appear in the Dock.
 
 ## Builds and releases
-GitHub Actions builds every push on the `xcode-27` runner. Pushes to any branch publish a
-versioned **prerelease** (for example `v4.0.7`); pushing a `v*` tag publishes a normal release.
+GitHub Actions builds every push on the `xcode-27` runner and uploads a temporary build
+artifact. Ordinary branch pushes do **not** create a release. A release is published only
+when a `v*` tag is pushed, or when the workflow is run manually with `release` enabled.
 Every versioned release is kept, so older builds remain available. Builds are ad-hoc signed,
 not notarized, and the downloadable archive is attached to the release together with its
 SHA-256 checksum. All releases are listed at
