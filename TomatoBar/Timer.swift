@@ -17,8 +17,6 @@ enum TBPreferences {
     static let windupVolume = "windupVolume"
     static let dingVolume = "dingVolume"
     static let tickingVolume = "tickingVolume"
-    static let tickingStyle = "tickingStyle"
-    static let tickingRate = "tickingRate"
 }
 
 final class TBTimer: NSObject, ObservableObject {
