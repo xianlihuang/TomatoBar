@@ -9,9 +9,12 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-27
 
     steps:
+      - name: Show Xcode version
+        run: xcodebuild -version
+
       - name: Delete old prerelease
         if: github.ref_type == 'branch'
         uses: dev-drprasad/delete-tag-and-release@v1.1
@@ -48,8 +51,9 @@ jobs:
 
       - name: Build
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           BUILT_PRODUCTS_DIR=$(xcodebuild -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release -showBuildSettings | awk '/^ *BUILT_PRODUCTS_DIR = / {print $3}')
-          xcodebuild build -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release MARKETING_VERSION=${{github.ref_name}} CODE_SIGN_IDENTITY="CI Code Signing" CODE_SIGN_STYLE=Manual ONLY_ACTIVE_ARCH=NO
+          xcodebuild build -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release MARKETING_VERSION="$VERSION" CODE_SIGN_IDENTITY="CI Code Signing" CODE_SIGN_STYLE=Manual ONLY_ACTIVE_ARCH=NO
           cp -r "$BUILT_PRODUCTS_DIR/TomatoBar.app" .
           zip -r "TomatoBar-${{env.version}}.zip" "TomatoBar.app"
 

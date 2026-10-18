@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://raw.githubusercontent.com/ivoronin/TomatoBar/main/TomatoBar/Assets.xcassets/AppIcon.appiconset/icon_128x128%402x.png" width="128" height="128"/>
+<img src="TomatoBar/Assets.xcassets/AppIcon.appiconset/icon_128x128%402x.png" width="128" height="128"/>
 <p>
  
 <h1 align="center">TomatoBar</h1>
@@ -7,21 +7,40 @@
 <img src="https://img.shields.io/github/actions/workflow/status/ivoronin/TomatoBar/main.yml?branch=main"/> <img src="https://img.shields.io/github/downloads/ivoronin/TomatoBar/total"/> <img src="https://img.shields.io/github/v/release/ivoronin/TomatoBar?display_name=tag"/> <img src="https://img.shields.io/homebrew/cask/v/tomatobar"/>
 </p>
 
-<img
-  src="https://github.com/ivoronin/TomatoBar/raw/main/screenshot.png?raw=true"
-  alt="Screenshot"
-  width="50%"
-  align="right"
-/>
+<p align="center">
+  <img src="screenshot.png" alt="TomatoBar running on macOS 27" width="320"/>
+  <br/>
+  <sub>TomatoBar on macOS 27 — Liquid Glass, live progress dial, and session markers.</sub>
+</p>
 
 ## Overview
-Have you ever heard of Pomodoro? It’s a great technique to help you keep track of time and stay on task during your studies or work. Read more about it on <a href="https://en.wikipedia.org/wiki/Pomodoro_Technique">Wikipedia</a>.
+TomatoBar is a focused Pomodoro timer that lives in your macOS menu bar. It keeps the
+technique simple: choose a focus interval, work until the timer ends, take a short break,
+and take a longer break after a full set.
 
-TomatoBar is world's neatest Pomodoro timer for the macOS menu bar. All the essential features are here - configurable
-work and rest intervals, optional sounds, discreet actionable notifications, global hotkey.
+Version 4 is rebuilt for **macOS 27** and adopts the **Liquid Glass** design language. The
+popover now has a live progress dial, session markers, glass controls, and a cleaner
+settings layout, while the timer engine is more reliable across sleep, wake, and repeated
+intervals.
 
-TomatoBar is fully sandboxed with no entitlements.
+## Requirements
+- macOS 27 or later
+- Apple silicon or Intel Mac
 
+## Features
+- Configurable focus, short break, and long break intervals
+- Focus sets with a long break after the final interval
+- Animated Liquid Glass progress dial and session markers
+- Countdown in the menu bar (optional)
+- Global start/stop shortcut
+- Actionable notifications with a **Skip break** action
+- Windup, ding, and ticking sounds with independent volume controls and previews
+- Launch at login
+- Sandboxed, with no network access
+- JSON event log for productivity analysis
+- `tomatobar://` URL scheme for automation
+
+## Install
 Download the latest release <a href="https://github.com/ivoronin/TomatoBar/releases/latest/">here</a> or install using Homebrew:
 ```
 brew install --cask tomatobar
@@ -34,12 +53,34 @@ brew install --cask --no-quarantine tomatobar
 
 ## Integration with other tools
 ### Event log
-TomatoBar logs state transitions in JSON format to `~/Library/Containers/com.github.ivoronin.TomatoBar/Data/Library/Caches/TomatoBar.log`. Use this data to analyze your productivity and enrich other data sources.
+TomatoBar logs state transitions in JSON format to
+`~/Library/Containers/com.github.ivoronin.TomatoBar/Data/Library/Caches/TomatoBar.log`.
+The log is checked at launch and rotated when it exceeds 5 MB (one `.1` backup is kept).
+Use this data to analyze your productivity and enrich other data sources.
+
 ### Starting and stopping the timer
-TomatoBar can be controlled using `tomatobar://` URLs. To start or stop the timer from the command line, use `open tomatobar://startStop`.
+TomatoBar can be controlled using `tomatobar://` URLs. To start or stop the timer from the
+command line:
+```
+open tomatobar://startStop
+```
+To skip a break:
+```
+open tomatobar://skipRest
+```
+To open or close the popover:
+```
+open tomatobar://show
+open tomatobar://hide
+```
+
+## Development
+Open `TomatoBar.xcodeproj` in Xcode 27, select the TomatoBar scheme, and run. The app is a
+menu bar app (`LSUIElement`), so it does not appear in the Dock.
 
 ## Older versions
-Touch bar integration and older macOS versions (earlier than Big Sur) are supported by TomatoBar versions prior to 3.0
+Touch bar integration is available in TomatoBar versions prior to 3.0. Versions prior to 4.0
+support older macOS releases.
 
 ## Licenses
  - Timer sounds are licensed from buddhabeats
