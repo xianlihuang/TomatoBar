@@ -82,7 +82,8 @@ menu bar app (`LSUIElement`), so it does not appear in the Dock.
 GitHub Actions builds every push on the `xcode-27` runner. Pushes to any branch publish a
 rolling **prerelease** named `prerelease`; pushing a `v*` tag publishes a normal release.
 Builds are ad-hoc signed, not notarized, and the downloadable archive is attached to the
-release together with its SHA-256 checksum.
+release together with its SHA-256 checksum. The current rolling prerelease is available at
+[github.com/xianlihuang/TomatoBar/releases/tag/prerelease](https://github.com/xianlihuang/TomatoBar/releases/tag/prerelease).
 
 ## Older versions
 Touch bar integration is available in TomatoBar versions prior to 3.0. Versions prior to 4.0
