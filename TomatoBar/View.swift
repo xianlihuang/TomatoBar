@@ -660,7 +660,8 @@ private struct SoundsView: View {
                 title: L("SoundsView.isTickingEnabled.label"),
                 volume: $player.tickingVolume,
                 isPreviewing: player.isPreviewingTicking,
-                isPreviewDisabled: player.isTicking
+                isPreviewDisabled: player.isTicking,
+                accessory: AnyView(TickingToneMenu(player: player))
             ) {
                 player.preview(.ticking)
             }
@@ -675,6 +676,7 @@ private struct SoundRow: View {
     @Binding var volume: Double
     let isPreviewing: Bool
     var isPreviewDisabled = false
+    var accessory: AnyView? = nil
     let preview: () -> Void
 
     var body: some View {
@@ -687,6 +689,10 @@ private struct SoundRow: View {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
+
+            if let accessory {
+                accessory
+            }
 
             Spacer(minLength: 4)
 
@@ -717,6 +723,54 @@ private struct SoundRow: View {
                 .frame(width: 32, alignment: .trailing)
         }
         .frame(height: 44)
+    }
+}
+
+
+private struct TickingToneMenu: View {
+    @ObservedObject var player: TBPlayer
+
+    var body: some View {
+        Menu {
+            Section {
+                ForEach(TickingStyle.allCases) { style in
+                    Button {
+                        player.auditionTicking(style: style)
+                    } label: {
+                        Text((player.tickingStyle == style ? "✓ " : "") + L("TickingStyle.\(style.rawValue)"))
+                    }
+                }
+            } header: {
+                Text(L("TickingStyle.section"))
+            }
+
+            Section {
+                ForEach(TickingRate.allCases) { rate in
+                    Button {
+                        player.auditionTicking(rate: rate)
+                    } label: {
+                        let title = L("TickingRate.\(rate.rawValue)")
+                        let detail = L("TickingRate.\(rate.rawValue).short")
+                        Text((player.tickingRate == rate ? "✓ " : "") + "\(title) · \(detail)")
+                    }
+                }
+            } header: {
+                Text(L("TickingRate.section"))
+            }
+        } label: {
+            HStack(spacing: 2) {
+                Text(L("TickingToneMenu.label"))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 7, weight: .semibold))
+            }
+            .font(.system(size: 9, weight: .medium, design: .rounded))
+            .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(L("TickingToneMenu.help"))
+        .accessibilityLabel(Text(L("TickingToneMenu.help")))
     }
 }
 

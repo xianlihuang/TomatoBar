@@ -2,6 +2,20 @@ import AVFoundation
 import Combine
 import SwiftUI
 
+enum TickingStyle: String, CaseIterable, Identifiable {
+    case wood, mechanical, electronic
+
+    var id: String { rawValue }
+    var assetPrefix: String { rawValue.capitalized }
+}
+
+enum TickingRate: String, CaseIterable, Identifiable {
+    case slow, medium, fast
+
+    var id: String { rawValue }
+    var assetSuffix: String { rawValue.capitalized }
+}
+
 final class TBPlayer: ObservableObject {
     enum Sound {
         case windup, ding, ticking
@@ -44,6 +58,20 @@ final class TBPlayer: ObservableObject {
         }
     }
 
+    @Published var tickingStyle: TickingStyle {
+        didSet {
+            defaults.set(tickingStyle.rawValue, forKey: TBPreferences.tickingStyle)
+            reloadTickingSound()
+        }
+    }
+
+    @Published var tickingRate: TickingRate {
+        didSet {
+            defaults.set(tickingRate.rawValue, forKey: TBPreferences.tickingRate)
+            reloadTickingSound()
+        }
+    }
+
     @Published private(set) var isPreviewingTicking = false
     @Published private(set) var isTicking = false
 
@@ -59,10 +87,12 @@ final class TBPlayer: ObservableObject {
         windupVolume = Self.clamp(defaults.object(forKey: TBPreferences.windupVolume) as? Double ?? 1)
         dingVolume = Self.clamp(defaults.object(forKey: TBPreferences.dingVolume) as? Double ?? 1)
         tickingVolume = Self.clamp(defaults.object(forKey: TBPreferences.tickingVolume) as? Double ?? 1)
+        tickingStyle = TickingStyle(rawValue: defaults.string(forKey: TBPreferences.tickingStyle) ?? "") ?? .wood
+        tickingRate = TickingRate(rawValue: defaults.string(forKey: TBPreferences.tickingRate) ?? "") ?? .medium
 
         windupSound = Self.makePlayer(named: "windup")
         dingSound = Self.makePlayer(named: "ding")
-        tickingSound = Self.makePlayer(named: "ticking")
+        tickingSound = Self.makePlayer(named: Self.tickingAssetName(style: tickingStyle, rate: tickingRate))
 
         tickingSound?.numberOfLoops = -1
         windupSound?.prepareToPlay()
@@ -143,6 +173,22 @@ final class TBPlayer: ObservableObject {
         }
     }
 
+    /// Change the timbre/rate and immediately play a short preview. If a focus
+    /// interval is active, the new sound replaces the running loop instead.
+    func auditionTicking(style: TickingStyle? = nil, rate: TickingRate? = nil) {
+        if let style {
+            tickingStyle = style
+        }
+        if let rate {
+            tickingRate = rate
+        }
+
+        guard !isTicking else {
+            return
+        }
+        startTickingPreview()
+    }
+
     private func toggleTickingPreview() {
         if isPreviewingTicking {
             stopTicking()
@@ -154,8 +200,12 @@ final class TBPlayer: ObservableObject {
         guard !isTicking else {
             return
         }
+        startTickingPreview()
+    }
 
+    private func startTickingPreview() {
         tickingPreviewWorkItem?.cancel()
+        tickingPreviewWorkItem = nil
         guard tickingVolume > 0, let tickingSound else {
             return
         }
@@ -169,6 +219,25 @@ final class TBPlayer: ObservableObject {
         }
         tickingPreviewWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: workItem)
+    }
+
+    private func reloadTickingSound() {
+        tickingPreviewWorkItem?.cancel()
+        tickingPreviewWorkItem = nil
+        isPreviewingTicking = false
+        tickingSound?.stop()
+
+        tickingSound = Self.makePlayer(
+            named: Self.tickingAssetName(style: tickingStyle, rate: tickingRate)
+        )
+        tickingSound?.numberOfLoops = -1
+        tickingSound?.prepareToPlay()
+        applyVolume(tickingSound, tickingVolume)
+
+        if isTicking, tickingVolume > 0 {
+            tickingSound?.currentTime = 0
+            tickingSound?.play()
+        }
     }
 
     // MARK: - Volume
@@ -185,6 +254,10 @@ final class TBPlayer: ObservableObject {
 
     private static func clamp(_ volume: Double) -> Double {
         min(max(volume, 0), 2)
+    }
+
+    private static func tickingAssetName(style: TickingStyle, rate: TickingRate) -> String {
+        "Tick\(style.assetPrefix)\(rate.assetSuffix)"
     }
 
     private static func makePlayer(named name: String) -> AVAudioPlayer? {
