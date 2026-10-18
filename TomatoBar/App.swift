@@ -180,7 +180,10 @@ final class TBStatusItem: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // recreated on the next open instead of being retained for the rest of
         // the process lifetime.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-            guard let self, self.popover?.isShown != true else {
+            guard let self,
+                  self.timer?.isPopoverVisible != true,
+                  self.popover?.isShown != true
+            else {
                 return
             }
             self.popover?.contentViewController = nil
