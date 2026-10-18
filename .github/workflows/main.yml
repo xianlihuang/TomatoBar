@@ -39,7 +39,7 @@ jobs:
             PRERELEASE="false"
           else
             VERSION="4.0.${GITHUB_RUN_NUMBER}"
-            RELEASE_TAG="prerelease"
+            RELEASE_TAG="v${VERSION}"
             PRERELEASE="true"
           fi
           {
@@ -116,14 +116,6 @@ jobs:
             TomatoBar-${{ env.VERSION }}.zip
             TomatoBar-${{ env.VERSION }}.zip.sha256
           retention-days: 14
-
-      - name: Remove previous rolling prerelease
-        if: github.ref_type == 'branch'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release delete prerelease --cleanup-tag --yes || true
-          git push origin :refs/tags/prerelease || true
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

@@ -80,10 +80,11 @@ menu bar app (`LSUIElement`), so it does not appear in the Dock.
 
 ## Builds and releases
 GitHub Actions builds every push on the `xcode-27` runner. Pushes to any branch publish a
-rolling **prerelease** named `prerelease`; pushing a `v*` tag publishes a normal release.
-Builds are ad-hoc signed, not notarized, and the downloadable archive is attached to the
-release together with its SHA-256 checksum. The current rolling prerelease is available at
-[github.com/xianlihuang/TomatoBar/releases/tag/prerelease](https://github.com/xianlihuang/TomatoBar/releases/tag/prerelease).
+versioned **prerelease** (for example `v4.0.7`); pushing a `v*` tag publishes a normal release.
+Every versioned release is kept, so older builds remain available. Builds are ad-hoc signed,
+not notarized, and the downloadable archive is attached to the release together with its
+SHA-256 checksum. All releases are listed at
+[github.com/xianlihuang/TomatoBar/releases](https://github.com/xianlihuang/TomatoBar/releases).
 See [CHANGELOG.md](CHANGELOG.md) for the main changes in each release.
 
 ## Older versions
